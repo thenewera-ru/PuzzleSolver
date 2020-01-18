@@ -2,6 +2,7 @@ import measure.Measure;
 import model.Model;
 import model.board.Board;
 import io.writer.OutputWriter;
+import utils.Utils;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -11,11 +12,9 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
-
-    static final int n = 5; // Size of the board.
-    static final int trials = 1; // Experiments
 
     static class Pair implements Comparable<Pair>{
         int first, second;
@@ -39,48 +38,57 @@ public class Main {
     }
 
     public static void main(String[] args) throws Exception {
-        Map<Pair, Integer> results = new TreeMap<>();
-        Map<Pair, Model> compiledModels = compile(10, 5, 30);
-        ExecutorService pool = Executors.newFixedThreadPool(10);
-        for (Pair key : compiledModels.keySet()) {
-            Model m = compiledModels.get(key);
-            pool.execute(m);
+        Map<Pair, Model> models = compile(1, 4, 50);
+        Map<Pair, long[]> results = new TreeMap<>();
+        for (Pair key : models.keySet()) {
+            Model m = models.get(key);
+            m.run();
+            long[] ans = {m.getPathLength(), m.getTimeToFindSolution()};
+            results.put(key, ans);
         }
-        pool.shutdown();
-
-        try {
-            save(results, "output.txt");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        save(results, "output.txt");
+//        int[][] arr1 = {
+//                {1, 2, 3},
+//                {4, 5, 6},
+//                {7, 8, 9}
+//        };
+//        int[][] arr2 = {
+//                {1, 2, 3},
+//                {4, 5, 6},
+//                {7, 8, 9}
+//        };
     }
 
     static Map<Pair, Model> compile(int experiments, int size, int randomMoves) {
         Map<Pair, Model> ans = new TreeMap<>();
-        Random r = new Random();
+        Measure manhattanDistance = (int x, int y) -> { return x + y; };
+        Measure euclideanDistance = (int x, int y) -> { return x^2 + y^2; };
         for (int i = 0; i < experiments; ++i) {
-            int a = 1 + r.nextInt(10), b = 1 + r.nextInt(10);
-            if (ans.containsKey(new Pair(a, b)))
-                continue;
-            Model m = new Model();
-            Measure metric = (int x, int y) -> { return a * x + b * y; };
-            m.setMeasure(metric);
-            m.setSize(size);
-            m.setRandomMoves(randomMoves);
-            m.compile();
-            ans.put(new Pair(a, b), m);
+            Model m1 = new Model();
+            m1.setMeasure(euclideanDistance);
+            m1.setSize(size);
+            m1.setRandomMoves(randomMoves);
+            m1.compile();
+            ans.put(new Pair((i + 1), 1), m1);
+            Model m2 = new Model();
+            m2.setMeasure(manhattanDistance);
+            m2.setSize(size);
+            m2.setRandomMoves(randomMoves);
+            m2.compile();
+            ans.put(new Pair((i + 1), 2), m2);
         }
         return ans;
     }
 
 
-    static void save(Map<Pair, Integer> data, String fileName) throws IOException {
+    static void save(Map<Pair, long[]> data, String fileName) throws IOException {
         String path = new File(".").getCanonicalPath();
         OutputStream os = new FileOutputStream(path + "/" + fileName);
         OutputWriter writer = new OutputWriter(os);
-        writer.getInstance().println("a\tb\tMoves");
+        writer.printLine("Experiment\tMetric\t\t\tMoves\t\tTime(nanoseconds)");
         for (Pair key : data.keySet()) {
-            writer.getInstance().println(key.first + "\t" + key.second + "\t" + data.get(key));
+            writer.printLine(key.first + "\t\t\t" + (key.second == 1 ? "Manhattan" : "Euclidean") + "\t\t\t" +
+                    data.get(key)[0] + "\t\t" + data.get(key)[1]);
         }
         writer.close();
     }

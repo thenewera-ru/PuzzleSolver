@@ -1,18 +1,28 @@
 package io.writer;
 
-import java.io.OutputStream;
-import java.io.PrintWriter;
+import java.io.*;
 
 public class OutputWriter {
-    private PrintWriter out;
+    private final PrintWriter writer;
 
-    public OutputWriter(OutputStream os) {
-        this.out = new PrintWriter(os);
+    public OutputWriter(OutputStream outputStream) {
+        writer = new PrintWriter(new BufferedWriter(new OutputStreamWriter(outputStream)));
     }
 
-    public PrintWriter getInstance() { return this.out; }
+    public void print(Object... objects) {
+        for (int i = 0; i < objects.length; i++) {
+            if (i != 0)
+                writer.print(' ');
+            writer.print(objects[i]);
+        }
+    }
+
+    public void printLine(Object... objects) {
+        print(objects);
+        writer.println();
+    }
 
     public void close() {
-        this.out.close();
+        writer.close();
     }
 }

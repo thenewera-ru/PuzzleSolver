@@ -5,13 +5,22 @@ import java.util.*;
 import utils.Utils;
 import measure.Measure;
 
-public class Board {
+public class Board implements Comparable<Board> {
 
     private class Node {
         public int x, y;
         public Node(int x, int y) {
             this.x = x;
             this.y = y;
+        }
+        public Node(Node that) {
+            this.x = that.x;
+            this.y = that.y;
+        }
+
+        public void copyFrom(Node that) {
+            this.x = that.x;
+            this.y = that.y;
         }
     }
 
@@ -22,6 +31,8 @@ public class Board {
     private int stepsToSolve;
 
     private Node blankNode;
+
+    private int score;
 
     public Board(int n) {
         this.n = n;
@@ -43,7 +54,7 @@ public class Board {
             for (int y = 0; y < n; ++y)
                 instance[x][y] = from.getValue(x, y);
         stepsToSolve = from.stepsToSolve;
-        blankNode = from.blankNode;
+        blankNode.copyFrom(from.blankNode);
     }
 
     public int getValue(int x, int y) {
@@ -51,11 +62,6 @@ public class Board {
     }
 
 
-    public void move(Node tile) {
-        instance[blankNode.x][blankNode.y] = instance[tile.x][tile.y];
-        instance[tile.x][tile.y] = 0;
-        blankNode = tile;
-    }
 
     public int getSize() {
         return this.n;
@@ -71,10 +77,10 @@ public class Board {
                 if (tox < 0 || tox >= n || toy < 0 || toy >= n)
                     continue;
                 //
-                if (dx * dy != 0 || (dx == 0 && dy == 0))
+                if (dx * dy != 0 || (dx + dy == 0))
                     continue;
-                Node to = new Node(blankNode.x + dx, blankNode.y + dy);
-                moves.add(to);
+                Node safeMove = new Node(tox, toy);
+                moves.add(safeMove);
             }
         }
         return moves;
@@ -87,10 +93,16 @@ public class Board {
         return ans;
     }
 
+    public void move(Node newBlankTile) {
+        instance[blankNode.x][blankNode.y] = instance[newBlankTile.x][newBlankTile.y];
+        instance[newBlankTile.x][newBlankTile.y] = 0;
+        blankNode.copyFrom(newBlankTile);
+    }
+
     public List<Board> getAvailableBoards() {
         List<Board> boards = new ArrayList<>(4);
         for (Node move : getAvailableMoves())
-            boards.add(stepForward(move));
+            boards.add(this.stepForward(move));
         return boards;
     }
 
@@ -104,7 +116,7 @@ public class Board {
     }
 
     public void shuffle() {
-        int shuffles = 30; // [30, 100]
+        int shuffles = 30;
         this.shuffle(shuffles);
     }
 
@@ -128,18 +140,23 @@ public class Board {
                 if (instance[x][y] == 0)
                     continue;
                 int[] xy = Utils.getPositionFromMatrix(instance[x][y] - 1, n, n);
-                error += m.call(x - xy[0], y - xy[1]);
+                error += m.call(Math.abs(x - xy[0]), Math.abs(y - xy[1]));
             }
         }
         return error;
     }
 
-    private List<Board> getSnapshots(Map<Board, Board> graph, Board current) {
+    @Override
+    public Board clone() {
+        return new Board(this);
+    }
+
+    private List<Board> getSnapshots(Map<Board, Board> parent, Board current) {
         // Return the consecutive boards : each board represent the state of the game.
         Stack<Board> stck = new Stack<>();
         while (current != null) {
             stck.push(current);
-            current = graph.get(current);
+            current = parent.get(current);
         }
         List<Board> ans = new ArrayList<>();
         while (!stck.isEmpty())
@@ -150,9 +167,10 @@ public class Board {
     @Override
     public boolean equals(Object o) {
         if (o instanceof Board) {
+            Board other = (Board)o;
             for (int i = 0; i < n; ++i) {
                 for (int j = 0; j < n; ++j) {
-                    if (instance[i][j] != ((Board)o).getValue(i, j))
+                    if (instance[i][j] != other.getValue(i, j))
                         return false;
                 }
             }
@@ -163,54 +181,77 @@ public class Board {
 
     @Override
     public int hashCode() {
-        int hash = 0;
-        for (int i = 0; i < n; ++i) {
-            for (int j = 0; j < n; ++j) {
-                hash += ((n * n * hash) + instance[i][j]);
-            }
-        }
-        return hash;
+        return java.util.Arrays.deepHashCode(instance);
+    }
+
+    @Override
+    public int compareTo(Board that) {
+        return this.hashCode() - that.hashCode();
     }
 
 
     public List<Board> solveUsingSmartDijkstra(Measure m) {
-        HashMap<Board, Board> graph = new HashMap<>(); // To restore the path
+        HashMap<Board, Board> parent = new HashMap<>(); // To restore the path
         HashMap<Board, Integer> depth = new HashMap<>(); // How "deep" the search has gone
-        final HashMap<Board, Integer> score = new HashMap<>(); // F values of each available move
+        HashMap<Board, Integer> score = new HashMap<>(); // F values of each available move
         Comparator<Board> cmp = new Comparator<Board>() {
             @Override
             public int compare(Board o1, Board o2) {
                 return score.get(o1) - score.get(o2);
             }
         };
-        Queue<Board> open = new PriorityQueue<>(cmp);
-        graph.put(this, null);
+        PriorityQueue<Board> open = new PriorityQueue<>(cmp);
+        HashSet<Board> explored = new HashSet<>();
+        parent.put(this, null);
         depth.put(this, 0);
         open.add(this);
+        score.put(this, this.error(m));
+        int statesSeen = 0;
         while (open.size() > 0) {
             // stepsToSolve += 1; // stepForward()
-
-            Board bestMove = open.remove();
-            if (bestMove.isSolved())
-                return getSnapshots(graph, bestMove);
-            for (Board nextState: bestMove.getAvailableBoards()) {
-                if (graph.containsKey(nextState))
+            statesSeen += 1;
+            Board bestCurrentState = open.remove();
+            if (bestCurrentState.isSolved())
+                return getSnapshots(parent, bestCurrentState);
+            for (Board nextState: bestCurrentState.getAvailableBoards()) {
+                if (explored.contains(nextState))
                     continue;
-                graph.put(nextState, bestMove); // Update parent-child relationship
-                depth.put(nextState, depth.get(bestMove) + 1); // Update "how deep" traversal has gone
-                int error = nextState.error(m); // H (heuristic) score.
-                score.put(nextState, depth.get(bestMove) + error);
-                // First of all we update score for the node. F = G + H.
-                // (1) updateScore(@nextState)
-                // (2) addToQueue(@nextState)
-                open.add(nextState);
+                if (!open.contains(nextState)) {
+                    Board to = nextState.clone();
+                    Board from = bestCurrentState.clone();
+                    parent.put(to, from); // Update parent-child relationship
+                    int curDepth = depth.get(from);
+                    depth.put(to, curDepth + 1); // Update "how deep" traversal has gone
+                    int error = to.error(m); // H (heuristic) score.
+                    to.score = curDepth + 1 + error;
+                    score.put(to, to.score);
+                    // First of all we update score for the node. F = G + H.
+                    // (1) updateScore(@nextState)
+                    // (2) addToQueue(@nextState)
+                    open.add(to);
+                } else if (open.contains(nextState)) { // We have already seen the bestMove state. Maybe we have found better, huh?
+                    // Sort of like relaxation (aka relaxing bounds) in Dijkstra search
+                    int visitedMoveValue = score.get(nextState);
+                    int bestMoveValue = depth.get(bestCurrentState) + 1 + nextState.error(m);
+                    if (bestMoveValue < visitedMoveValue) { // Our path is better, so update correctly
+                        Board to = nextState.clone();
+                        Board from = bestCurrentState.clone();
+                        parent.put(to, from);
+                        depth.put(to, depth.get(from) + 1);
+                        open.remove(to);
+                        to.score = bestMoveValue;
+                        score.put(to, nextState.score);
+                        open.add(to);
+                    }
+                }
             }
+            explored.add(bestCurrentState);
         }
         // We haven't reached the final state. So returning null
         return null;
     }
 
-    public int getPathLength() {
+    public final int getPathLength() {
         return this.stepsToSolve;
     }
 

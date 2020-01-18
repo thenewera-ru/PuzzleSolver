@@ -1,2 +1,7 @@
-a	b	Moves
-10	4	6
+Experiment	Metric			Moves		Time(nanoseconds)
+1			Manhattan			26		142614000000
+1			Euclidean			24		83000000
+
+
+
+
