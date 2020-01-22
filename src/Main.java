@@ -9,10 +9,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 public class Main {
 
@@ -38,25 +35,22 @@ public class Main {
     }
 
     public static void main(String[] args) throws Exception {
-        Map<Pair, Model> models = compile(1, 4, 50);
+        Map<Pair, Model> models = compile(1000, 4, 50);
         Map<Pair, long[]> results = new TreeMap<>();
+        ExecutorService threads = Executors.newFixedThreadPool(10);
         for (Pair key : models.keySet()) {
             Model m = models.get(key);
-            m.run();
+            threads.submit(m);
+        }
+        threads.shutdown();
+        threads.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+        // Done, now save the results
+        for (Pair key : models.keySet()) {
+            Model m = models.get(key);
             long[] ans = {m.getPathLength(), m.getTimeToFindSolution()};
             results.put(key, ans);
         }
         save(results, "output.txt");
-//        int[][] arr1 = {
-//                {1, 2, 3},
-//                {4, 5, 6},
-//                {7, 8, 9}
-//        };
-//        int[][] arr2 = {
-//                {1, 2, 3},
-//                {4, 5, 6},
-//                {7, 8, 9}
-//        };
     }
 
     static Map<Pair, Model> compile(int experiments, int size, int randomMoves) {

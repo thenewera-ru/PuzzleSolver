@@ -7,7 +7,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
-public class Model {
+public class Model implements Runnable {
 
     private class Node {
         public int x, y;
@@ -55,6 +55,7 @@ public class Model {
         return this;
     }
 
+    @Override
     public void run() {
         Instant start = Instant.now();
         this.solution = this.board.solveUsingSmartDijkstra(this.h);
