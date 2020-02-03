@@ -13,10 +13,6 @@ public class Board implements Comparable<Board> {
             this.x = x;
             this.y = y;
         }
-        public Node(Node that) {
-            this.x = that.x;
-            this.y = that.y;
-        }
 
         public void copyFrom(Node that) {
             this.x = that.x;
@@ -206,10 +202,8 @@ public class Board implements Comparable<Board> {
         depth.put(this, 0);
         open.add(this);
         score.put(this, this.error(m));
-        int statesSeen = 0;
         while (open.size() > 0) {
             // stepsToSolve += 1; // stepForward()
-            statesSeen += 1;
             Board bestCurrentState = open.remove();
             if (bestCurrentState.isSolved())
                 return getSnapshots(parent, bestCurrentState);

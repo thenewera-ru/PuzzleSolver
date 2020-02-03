@@ -9,13 +9,6 @@ import java.util.List;
 
 public class Model implements Runnable {
 
-    private class Node {
-        public int x, y;
-        public Node(int x, int y) {
-            this.x = x;
-            this.y = y;
-        }
-    }
 
     private Measure h; // Heuristic function
     private int size; // The size of the grid
