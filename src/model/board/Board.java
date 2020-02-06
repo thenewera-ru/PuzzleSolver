@@ -135,12 +135,14 @@ public class Board implements Comparable<Board> {
             for (int y = 0; y < n; ++y) {
                 if (instance[x][y] == 0)
                     continue;
-                int[] xy = Utils.getPositionFromMatrix(instance[x][y] - 1, n, n);
+                int[] xy = Utils.getPosition(instance[x][y] - 1, n);
                 error += m.call(Math.abs(x - xy[0]), Math.abs(y - xy[1]));
             }
         }
         return error;
     }
+
+    
 
     @Override
     public Board clone() {
